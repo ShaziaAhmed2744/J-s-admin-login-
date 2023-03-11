@@ -1,0 +1,94 @@
+// Import necessary modules
+const express = require('express');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+// Create Express app
+const app = express();
+
+// Set up body parser to parse incoming form data
+app.use(express.urlencoded({ extended: false }));
+
+// Connect to MongoDB database
+mongoose.connect('mongodb://localhost/admin_app', { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.log(err));
+
+// Define schema for admin user
+const adminSchema = new mongoose.Schema({
+  email: { type: String, required: true },
+  password: { type: String, required: true }
+});
+
+// Define model for admin user
+const Admin = mongoose.model('Admin', adminSchema);
+
+// Define a route to serve the admin login page
+app.get('/admin-login', (req, res) => {
+  res.send(`
+    <h1>Admin Login</h1>
+    <form method="POST" action="/admin-login">
+      <label>Email:</label>
+      <input type="email" name="email" required><br>
+      <label>Password:</label>
+      <input type="password" name="password" required><br>
+      <button type="submit">Login</button>
+    </form>
+  `);
+});
+
+// Define a route to handle form submissions from the admin login page
+app.post('/admin-login', async (req, res) => {
+  const { email, password } = req.body;
+
+  // Check if email and password are provided
+  if (!email || !password) {
+    return res.status(400).send('Email and password are required');
+  }
+
+  try {
+    // Find the admin user by email
+    const admin = await Admin.findOne({ email });
+
+    // If admin user is not found, return error
+    if (!admin) {
+      return res.status(401).send('Invalid email or password');
+    }
+
+    // Compare provided password with stored password
+    const isMatch = await bcrypt.compare(password, admin.password);
+
+    // If passwords do not match, return error
+    if (!isMatch) {
+      return res.status(401).send('Invalid email or password');
+    }
+
+    // If passwords match, redirect to admin dashboard
+    res.redirect('/admin-dashboard');
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).send('Server error');
+  }
+});
+
+// Define a route to serve the admin dashboard page
+app.get('/admin-dashboard', (req, res) => {
+  res.send(`
+    <h1>Admin Dashboard</h1>
+    <p>Welcome, admin!</p>
+    <a href="/logout">Logout</a>
+  `);
+});
+
+// Define a route to handle logout
+app.get('/logout', (req, res) => {
+  res.send(`
+    <h1>Logged out</h1>
+    <p>You have been logged out.</p>
+  `);
+});
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
